@@ -16,15 +16,19 @@ const port = 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Shared Gemini Client with required User-Agent
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+// Helper to safely get the Gemini Client only when an API key is present
+function getGeminiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+}
 
 // Health check endpoint
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -44,7 +48,8 @@ app.post('/api/gemini/analyze-room', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Uma imagem em base64 é necessária para análise.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.status(503).json({
         error: 'Chave de API Gemini não encontrada. Configure-a no painel Secrets do AI Studio.',
       });
@@ -157,7 +162,6 @@ Sua missão é responder EXCLUSIVAMENTE em formato JSON estruturado com os segui
     try {
       parsedResult = JSON.parse(textOutput);
     } catch {
-      // Fallback clean markdown if present
       const cleaned = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
       parsedResult = JSON.parse(cleaned);
     }
@@ -180,7 +184,8 @@ app.post('/api/gemini/generate-furniture-image', async (req: Request, res: Respo
       return res.status(400).json({ error: 'Um texto/prompt é obrigatório para geração.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.status(503).json({
         error: 'Chave de API Gemini não encontrada. Configure-a no painel Secrets do AI Studio.',
       });
@@ -262,7 +267,8 @@ app.post('/api/gemini/edit-furniture-image', async (req: Request, res: Response)
       return res.status(400).json({ error: 'Imagem base64 e instrução de edição são obrigatórias.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.status(503).json({
         error: 'Chave de API Gemini não encontrada. Configure-a no painel Secrets do AI Studio.',
       });
@@ -330,8 +336,8 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR !== 'true',
-        watch: process.env.DISABLE_HMR === 'true' ? null : {},
+        hmr: false,
+        watch: null,
       },
       appType: 'spa',
     });
@@ -343,9 +349,18 @@ async function startServer() {
     });
   }
 
-  app.listen(port, '0.0.0.0', () => {
+  const server = app.listen(port, '0.0.0.0', () => {
     console.log(`MarcenariaPro server listening on port ${port}`);
   });
+
+  const cleanup = () => {
+    server.close(() => {
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', cleanup);
+  process.on('SIGINT', cleanup);
 }
 
 startServer().catch((err) => {
