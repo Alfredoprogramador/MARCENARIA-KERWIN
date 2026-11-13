@@ -1,0 +1,6 @@
+{
+  "name": "MarcenariaPro 3D & ERP",
+  "description": "Sistema completo para marcenaria com cálculo de corte otimizado, geração 3D e Realidade Aumentada a partir de fotos e medidas manuais, exportação DXF/OBJ/SketchUp, cadastro de clientes e profissionais, orçamentos em PDF, fluxo de caixa e integração Google Workspace.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
